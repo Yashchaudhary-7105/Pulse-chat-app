@@ -4,6 +4,10 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 import { connectDB } from "./lib/db.js";
 
@@ -40,64 +44,38 @@ app.get("/health", (req, res) => {
 });
 
 if (process.env.NODE_ENV === "production") {
-  // Try multiple possible paths for the frontend dist directory
-  const possiblePaths = [
-    path.join(process.cwd(), "frontend/dist"),
-    path.join(process.cwd(), "../frontend/dist"),
-    path.join(__dirname, "../../frontend/dist"),
-    path.join(__dirname, "../../../frontend/dist"),
-    path.join(process.cwd(), "dist"),
-    path.join(__dirname, "../dist")
-  ];
+  // Serve the frontend build (for Vite use 'dist', for CRA use 'build')
+  const clientBuildPath = path.join(__dirname, '..', 'frontend', 'dist');
   
-  let frontendPath = null;
+  console.log("Attempting to serve frontend from:", clientBuildPath);
+  console.log("Frontend path exists:", fs.existsSync(clientBuildPath));
   
-  // Find the first path that exists
-  for (const testPath of possiblePaths) {
-    if (fs.existsSync(testPath)) {
-      frontendPath = testPath;
-      console.log("Found frontend dist at:", frontendPath);
-      break;
-    }
-  }
-  
-  if (frontendPath) {
-    // Serve static files from the frontend dist directory
-    app.use(express.static(frontendPath));
-    console.log("Serving static files from:", frontendPath);
-
-    // Handle React routing - return index.html for all non-API routes
-    app.get("*", (req, res) => {
-      // Skip API routes
-      if (req.path.startsWith("/api/")) {
-        return res.status(404).json({ message: "API route not found" });
-      }
-      
-      const indexPath = path.join(frontendPath, "index.html");
-      if (fs.existsSync(indexPath)) {
-        console.log("Serving index.html for route:", req.path);
-        res.sendFile(indexPath);
-      } else {
-        console.log("index.html not found at:", indexPath);
-        res.status(404).send("Frontend not found");
-      }
-    });
-  } else {
-    console.log("Frontend dist directory not found. Available paths checked:");
-    possiblePaths.forEach((p, i) => {
-      console.log(`${i + 1}. ${p} - exists: ${fs.existsSync(p)}`);
-    });
+  if (fs.existsSync(clientBuildPath)) {
+    app.use(express.static(clientBuildPath));
+    console.log("Serving static files from:", clientBuildPath);
     
-    // Fallback route for when frontend is not found
-    app.get("*", (req, res) => {
-      res.status(404).json({ 
-        message: "Frontend not built or not found",
-        pathsChecked: possiblePaths,
-        currentWorkingDir: process.cwd(),
-        __dirname: __dirname
-      });
-    });
+    // List files in the dist directory for debugging
+    try {
+      const distFiles = fs.readdirSync(clientBuildPath);
+      console.log("Files in dist directory:", distFiles);
+    } catch (err) {
+      console.log("Error reading dist directory:", err.message);
+    }
+  } else {
+    console.log("Frontend dist directory not found at:", clientBuildPath);
   }
+
+  // SPA fallback (after API routes)
+  app.get('*', (req, res) => {
+    if (req.path.startsWith('/api')) return res.status(404).send('Not found');
+    
+    const indexPath = path.join(clientBuildPath, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      res.status(404).send('Frontend not found');
+    }
+  });
 }
 
 // Add error handling middleware

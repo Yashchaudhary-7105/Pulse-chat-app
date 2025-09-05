@@ -29,13 +29,25 @@ app.use(
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 
+// Health check endpoint
+app.get("/health", (req, res) => {
+  res.json({ 
+    status: "OK", 
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV,
+    port: PORT
+  });
+});
+
 if (process.env.NODE_ENV === "production") {
   // Try multiple possible paths for the frontend dist directory
   const possiblePaths = [
     path.join(process.cwd(), "frontend/dist"),
     path.join(process.cwd(), "../frontend/dist"),
     path.join(__dirname, "../../frontend/dist"),
-    path.join(__dirname, "../../../frontend/dist")
+    path.join(__dirname, "../../../frontend/dist"),
+    path.join(process.cwd(), "dist"),
+    path.join(__dirname, "../dist")
   ];
   
   let frontendPath = null;
@@ -52,6 +64,7 @@ if (process.env.NODE_ENV === "production") {
   if (frontendPath) {
     // Serve static files from the frontend dist directory
     app.use(express.static(frontendPath));
+    console.log("Serving static files from:", frontendPath);
 
     // Handle React routing - return index.html for all non-API routes
     app.get("*", (req, res) => {
@@ -62,8 +75,10 @@ if (process.env.NODE_ENV === "production") {
       
       const indexPath = path.join(frontendPath, "index.html");
       if (fs.existsSync(indexPath)) {
+        console.log("Serving index.html for route:", req.path);
         res.sendFile(indexPath);
       } else {
+        console.log("index.html not found at:", indexPath);
         res.status(404).send("Frontend not found");
       }
     });
@@ -77,7 +92,9 @@ if (process.env.NODE_ENV === "production") {
     app.get("*", (req, res) => {
       res.status(404).json({ 
         message: "Frontend not built or not found",
-        pathsChecked: possiblePaths
+        pathsChecked: possiblePaths,
+        currentWorkingDir: process.cwd(),
+        __dirname: __dirname
       });
     });
   }

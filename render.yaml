@@ -4,8 +4,12 @@ services:
     env: node
     plan: free
     rootDir: .
-    buildCommand: npm run build
-    startCommand: npm start
+    buildCommand: |
+      npm ci
+      npm --prefix frontend ci --include=dev
+      npm --prefix frontend run build
+      npm --prefix backend ci
+    startCommand: npm run start --prefix backend
     envVars:
       - key: NODE_ENV
         value: production

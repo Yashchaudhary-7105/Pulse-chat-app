@@ -4,7 +4,6 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 
 import path from "path";
-import { fileURLToPath } from "url";
 
 import { connectDB } from "./lib/db.js";
 
@@ -15,8 +14,6 @@ import { app, server } from "./lib/socket.js";
 dotenv.config();
 
 const PORT = process.env.PORT;
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 app.use(express.json());
 app.use(cookieParser());
@@ -33,8 +30,14 @@ app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 
 if (process.env.NODE_ENV === "production") {
+  // Use process.cwd() which should be the project root on Render
+  const frontendPath = path.join(process.cwd(), "frontend/dist");
+  
+  console.log("Project root:", process.cwd());
+  console.log("Frontend path:", frontendPath);
+  
   // Serve static files from the frontend dist directory
-  app.use(express.static(path.join(__dirname, "../../frontend/dist")));
+  app.use(express.static(frontendPath));
 
   // Handle React routing - return index.html for all non-API routes
   app.get("*", (req, res) => {
@@ -42,7 +45,7 @@ if (process.env.NODE_ENV === "production") {
     if (req.path.startsWith("/api/")) {
       return res.status(404).json({ message: "API route not found" });
     }
-    res.sendFile(path.join(__dirname, "../../frontend/dist/index.html"));
+    res.sendFile(path.join(frontendPath, "index.html"));
   });
 }
 
